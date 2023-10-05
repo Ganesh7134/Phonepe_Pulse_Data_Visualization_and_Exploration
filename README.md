@@ -26,11 +26,14 @@ You can interact with the visualizations by clicking on them and hovering over t
 To get started with the PhonePe Pulse Visualization tool, follow these steps:
 
 1. Clone the GitHub repository:
+
    git clone https://github.com/your_username/phonepe_pulse_visualization.git
 2. Run the main.py file:
+   
    python -m streamlit run file_name.py
    
 3.Open the web app in your browser:
+
    http://localhost:8501
 
 ### Conclusion
