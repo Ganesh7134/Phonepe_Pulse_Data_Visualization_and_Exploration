@@ -198,18 +198,29 @@ def insights():
     
         with st.expander("Map transactions amount by state and district"):
             st.header("Map transactions amount by state and district")
-            df = pd.read_sql("select * from  map_transaction;",conn,index_col="State")
+            df = pd.read_sql("select * from  map_transaction1;",conn,index_col="State")
 
             # Create a multiselect for states
             state_options = df.index.unique().tolist()
             selected_state2 = st.multiselect("Select states:", state_options,key="selected_state2")
 
-            def get_data_for_state(state):
+            # Create a slider for year
+            year_start = 2018
+            year_end = 2023
+            selected_year1 = st.slider("Select year:", year_start, year_end,key="selected_year1")
+        
+            # Create a slider for quarter
+            quarter_start = 1
+            quarter_end = 4
+            selected_quarter1 = st.slider("Select quarter:", quarter_start, quarter_end,key="selected_quarter1")
+
+            # Get the data for the selected state, year, and quarter
+            def get_data_for_state_year_quarter(state, year, quarter):
                 state_df = df.loc[state]
+                state_df = state_df.loc[(state_df['Year'] == year) & (state_df['Quater'] == quarter)]
                 return state_df
-            
-            # Get the data for the selected state
-            state_df = get_data_for_state(selected_state2)
+
+            state_df = get_data_for_state_year_quarter(selected_state2, selected_year1, selected_quarter1)
 
             # Aggregate data by 'State' for Transaction_Amount and Transaction_count
             state_amount = state_df.groupby(['State'])['Transaction_amount'].sum().reset_index()
@@ -223,34 +234,47 @@ def insights():
                 x="State",
                 y="Transaction_amount",
                 color="State",
-                title="Total Transaction Amount by State"
+                title="Total Transaction Amount by State in {} Year Quarter {}".format(selected_year1, selected_quarter1)
             )
 
-            # Create a bar graph of district-wise transaction amount for the selected state
+            # Create a bar graph of district-wise transaction amount for the selected state, year, and quarter
             fig_district = px.bar(
                 district_amount,
                 x="District_name",
                 y="Transaction_amount",
                 color="District_name",
-                title="Total Transaction Amount by District in {} State".format(selected_state2)
+                title="Total Transaction Amount by District in {} State {} Year Quarter {}".format(selected_state2, selected_year1, selected_quarter1)
             )
+
+            # Display the graphs on Streamlit
             st.plotly_chart(fig_state)
             st.plotly_chart(fig_district)
 
         with st.expander("Top transactions amount by state and district"):
             st.header("Top transactions amount by state and district")
-            df = pd.read_sql("select * from top_transactions;",conn,index_col="State")
+            df = pd.read_sql("select * from top_transactions1;",conn,index_col="State")
 
             # Create a multiselect for states
             state_options = df.index.unique().tolist()
             selected_state3 = st.multiselect("Select states:", state_options,key="selected_state3")
 
-            def get_data_for_state(state):
+            # Create a slider for year
+            year_start = 2018
+            year_end = 2023
+            selected_year = st.slider("Select year:", year_start, year_end)
+
+            # Create a slider for quarter
+            quarter_start = 1
+            quarter_end = 4
+            selected_quarter = st.slider("Select quarter:", quarter_start, quarter_end)
+
+            # Get the data for the selected state, year, and quarter
+            def get_data_for_state_year_quarter(state, year, quarter):
                 state_df = df.loc[state]
+                state_df = state_df.loc[(state_df['Year'] == year) & (state_df['Quater'] == quarter)]
                 return state_df
-            
-            # Get the data for the selected state
-            state_df = get_data_for_state(selected_state3)
+
+            state_df = get_data_for_state_year_quarter(selected_state3, selected_year, selected_quarter)
 
             # Aggregate data by 'State' for Transaction_Amount and Transaction_count
             state_amount = state_df.groupby(['State'])['Transaction_amount'].sum().reset_index()
@@ -264,19 +288,19 @@ def insights():
                 x="State",
                 y="Transaction_amount",
                 color="State",
-                title="Total Transaction Amount by State"
+                title="Total Transaction Amount by State in {} Year Quarter {}".format(selected_year, selected_quarter)
             )
 
-            # Create a bar graph of district-wise transaction amount for the selected state
+            # Create a bar graph of district-wise transaction amount for the selected state, year, and quarter
             fig_district = px.bar(
                 district_amount,
                 x="District_name",
                 y="Transaction_amount",
                 color="District_name",
-                title="Total Transaction Amount by District in {} State".format(selected_state3)
+                title="Total Transaction Amount by District in {} State {} Year Quarter {}".format(selected_state3, selected_year, selected_quarter)
             )
 
-
+            # Display the graphs on Streamlit
             st.plotly_chart(fig_state)
             st.plotly_chart(fig_district)
 
@@ -371,7 +395,7 @@ def insights():
                 with st.expander("Pie chart of Total transaction count by state"):
                     st.plotly_chart(Pie_chart)
             with container:
-                df = pd.read_sql("select * from map_transaction;",conn)
+                df = pd.read_sql("select * from  map_transaction1;",conn)
                 grouped_df = df.groupby(['District_name'])['Transaction_amount'].sum()
                 dict_ = grouped_df.to_dict()
                 labels = list(dict_.keys())
@@ -392,7 +416,7 @@ def insights():
                 with st.expander("Pie chart of Total Map transactions amount by district"):
                     st.plotly_chart(Pie_chart)
             with container:
-                df = pd.read_sql("select * from map_transaction;",conn)
+                df = pd.read_sql("select * from  map_transaction1;",conn)
                 grouped_df = df.groupby(['District_name'])['Transaction_count'].sum()
                 dict_ = grouped_df.to_dict()
                 labels = list(dict_.keys())
@@ -791,42 +815,54 @@ def insights():
 
             # Create a multiselect for states
             state_options = df.index.unique().tolist()
-            selected_state = st.multiselect("Select states:", state_options)
+            selected_state = st.multiselect("Select states:", state_options, key="selected_state")
 
-            # Create a function to get the data for the selected state
-            def get_data_for_state(state):
+            # Create a slider for year
+            year_start = 2018
+            year_end = 2023
+            selected_year = st.slider("Select year:", year_start, year_end)
+
+            # Create a slider for quarter
+            quarter_start = 1
+            quarter_end = 4
+            selected_quarter = st.slider("Select quarter:", quarter_start, quarter_end)
+
+            # Get the data for the selected state, year, and quarter
+            def get_data_for_state_year_quarter(state, year, quarter):
                 state_df = df.loc[state]
+                state_df = state_df.loc[(state_df['Year'] == year) & (state_df['Quater'] == quarter)]
                 return state_df
 
-            # Get the data for the selected state
-            state_df = get_data_for_state(selected_state)
+            state_df = get_data_for_state_year_quarter(selected_state, selected_year, selected_quarter)
 
-            # Aggregate data by 'State' for Transaction_Amount and Transaction_count
+            # Aggregate data by 'State' for registeredUser
             state_amount = state_df.groupby(['State'])['registeredUser'].sum().reset_index()
 
-            # # Aggregate data by 'District' for Transaction_Amount and Transaction_count
+            # Aggregate data by 'District' for registeredUser
             district_amount = state_df.groupby(['District_name'])['registeredUser'].sum().reset_index()
 
-            # Create a bar graph of state-wise transaction amount
+            # Create a bar graph of state-wise registeredUsers
             fig_state = px.bar(
                 state_amount,
                 x="State",
                 y="registeredUser",
                 color="State",
-                title="Total registeredUsers by State"
+                title="Total Registered Users by State in {} Year Quarter {}".format(selected_year, selected_quarter)
             )
 
-            # Create a bar graph of district-wise transaction amount for the selected state
+            # Create a bar graph of district-wise registeredUsers for the selected state, year, and quarter
             fig_district = px.bar(
                 district_amount,
                 x="District_name",
                 y="registeredUser",
                 color="District_name",
-                title="Total registeredUser by District in {} State".format(selected_state)
+                title="Total Registered Users by District in {} State {} Year Quarter {}".format(selected_state, selected_year, selected_quarter)
             )
 
+            # Display the graphs on Streamlit
             st.plotly_chart(fig_state)
             st.plotly_chart(fig_district)
+
         with st.expander("Top registeredUsers by state and district"):
             st.header("Top registeredUsers by state and district")
             # Load the data
@@ -834,40 +870,51 @@ def insights():
 
             # Create a multiselect for states
             state_options = df.index.unique().tolist()
-            selected_state1 = st.multiselect("Select states:", state_options,key="selected_state1")
+            selected_state1 = st.multiselect("Select states:", state_options, key="selected_state1")
 
-            # Create a function to get the data for the selected state
-            def get_data_for_state(state):
+            # Create a slider for year
+            year_start = 2018
+            year_end = 2023
+            selected_year1 = st.slider("Select year:", year_start, year_end,key="selected_year1")
+
+            # Create a slider for quarter
+            quarter_start = 1
+            quarter_end = 4
+            selected_quarter1 = st.slider("Select quarter:", quarter_start, quarter_end,key="selected_quarter1")
+
+            # Get the data for the selected state, year, and quarter
+            def get_data_for_state_year_quarter(state, year, quarter):
                 state_df = df.loc[state]
+                state_df = state_df.loc[(state_df['Year'] == year) & (state_df['Quater'] == quarter)]
                 return state_df
 
-            # Get the data for the selected state
-            state_df = get_data_for_state(selected_state1)
+            state_df = get_data_for_state_year_quarter(selected_state1, selected_year1, selected_quarter1)
 
-            # Aggregate data by 'State' for Transaction_Amount and Transaction_count
+            # Aggregate data by 'State' for registeredUsers
             state_amount = state_df.groupby(['State'])['registeredUsers'].sum().reset_index()
 
-            # # Aggregate data by 'District' for Transaction_Amount and Transaction_count
+            # Aggregate data by 'District' for registeredUsers
             district_amount = state_df.groupby(['District_name'])['registeredUsers'].sum().reset_index()
 
-            # Create a bar graph of state-wise transaction amount
+            # Create a bar graph of state-wise registeredUsers
             fig_state = px.bar(
                 state_amount,
                 x="State",
                 y="registeredUsers",
                 color="State",
-                title="Total registeredUsers by State"
+                title="Total Registered Users by State in {} Year Quarter {}".format(selected_year1, selected_quarter1)
             )
 
-            # Create a bar graph of district-wise transaction amount for the selected state
+            # Create a bar graph of district-wise registeredUsers for the selected state, year, and quarter
             fig_district = px.bar(
                 district_amount,
                 x="District_name",
                 y="registeredUsers",
                 color="District_name",
-                title="Total registeredUser by District in {} State".format(selected_state1)
+                title="Total Registered Users by District in {} State {} Year Quarter {}".format(selected_state1, selected_year1, selected_quarter1)
             )
 
+            # Display the graphs on Streamlit
             st.plotly_chart(fig_state)
             st.plotly_chart(fig_district)
 
@@ -1278,7 +1325,7 @@ def insights():
                 st.plotly_chart(bar_chart5)
         def Q6():
             with container:
-                df = pd.read_sql("select * from map_transaction;",conn)
+                df = pd.read_sql("select * from  map_transaction1;",conn)
                 grouped_df = df.groupby(['District_name'])['Transaction_amount'].sum().sort_values(ascending=False).reset_index()
                 top_5_df = grouped_df.iloc[:5]
 
@@ -1292,7 +1339,7 @@ def insights():
                 st.plotly_chart(bar_chart6)
         def Q7():
             with container:
-                df = pd.read_sql("select * from map_transaction;",conn)
+                df = pd.read_sql("select * from  map_transaction1;",conn)
                 grouped_df = df.groupby(['State'])['Transaction_amount'].sum().sort_values(ascending=False).reset_index()
                 top_5_df = grouped_df.iloc[:5]
 
@@ -4889,4 +4936,3 @@ page_functions = {
     "About": about
 }
 page_functions[selected]()
-
