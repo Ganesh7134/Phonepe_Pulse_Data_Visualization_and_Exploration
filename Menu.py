@@ -9,7 +9,6 @@ import json
 import streamlit as st
 import webbrowser
 import mysql.connector
-import base64
 from streamlit_lottie import st_lottie
 
 host = "localhost"
@@ -166,34 +165,48 @@ def insights():
         print("Don't raise exception")
     def Transactions():
     
-        def get_data():
-            df = pd.read_sql("SELECT * FROM aggregated_transactions",conn,index_col="State")
+        def get_data(year, quarter):
+            query = f"SELECT * FROM aggregated_transactions WHERE Year = {year} AND Quater = {quarter}"
+            df = pd.read_sql(query, conn, index_col="State")
             return df
 
-        df = get_data()
+        # Create a year slider
+        year_start = 2018
+        year_end = 2023
+        selected_year = st.slider("Select Year:", year_start, year_end)
+
+        # Create a quarter slider based on the selected year
+        quarter_start = 1
+        quarter_end = 4
+        selected_quarter = st.slider("Select Quarter:", quarter_start, quarter_end)
+
+        # Get data for the selected year and quarter
+        df = get_data(selected_year, selected_quarter)
 
         # Aggregate data by 'State' for Transaction_Amount and Transaction_count
         data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
         data_count = df.groupby(['State'])['Transaction_count'].sum().reset_index()
 
-        fig = px.bar(
-            data_amount, 
-            x="State", 
-            y="Transaction_Amount", 
-            color="State", 
-            title="Total Transaction Amount by State"
-            )
-        with st.expander("Bar chart of transaction amount by state"):
-            st.plotly_chart(fig)
-        fig = px.bar(
-            data_count, 
-            x="State", 
-            y="Transaction_count", 
-            color="State", 
-            title="Total Transaction count by State"
-            )
-        with st.expander("Bar chart of transaction count by state"):
-            st.plotly_chart(fig)
+        # Create a Plotly bar chart for the total transaction amount by state
+        fig_amount = px.bar(
+            data_amount,
+            x="State",
+            y="Transaction_Amount",
+            color="State",
+            title="Total Transaction Amount by State for Year {} Quarter {}".format(selected_year, selected_quarter)
+        )
+        st.plotly_chart(fig_amount)
+
+        # Create a Plotly bar chart for the total transaction count by state
+        fig_count = px.bar(
+            data_count,
+            x="State",
+            y="Transaction_count",
+            color="State",
+            title="Total Transaction Count by State for Year {} Quarter {}".format(selected_year, selected_quarter)
+        )
+        st.plotly_chart(fig_count)
+
 
     
         with st.expander("Map transactions amount by state and district"):
@@ -250,9 +263,9 @@ def insights():
             st.plotly_chart(fig_state)
             st.plotly_chart(fig_district)
 
-        with st.expander("Top transactions amount by state and district"):
+        with st.expander("Top transactions amount by state and district and pincode"):
             st.header("Top transactions amount by state and district")
-            df = pd.read_sql("select * from top_transactions1;",conn,index_col="State")
+            df = pd.read_sql("select * from top_transaction_districts;",conn,index_col="State")
 
             # Create a multiselect for states
             state_options = df.index.unique().tolist()
@@ -282,6 +295,26 @@ def insights():
             # # Aggregate data by 'District' for Transaction_Amount and Transaction_count
             district_amount = state_df.groupby(['District_name'])['Transaction_amount'].sum().reset_index()
 
+            df1 = pd.read_sql("select * from top_transaction_pincode",conn,index_col="State")
+
+            def get_data_for_state_year_quarter(state, year, quarter):
+                state_df = df1.loc[state]
+                state_df = state_df.loc[(state_df['Year'] == year) & (state_df['Quater'] == quarter)]
+                return state_df
+            
+            state_df = get_data_for_state_year_quarter(selected_state3, selected_year, selected_quarter)
+
+            # Aggregate data by 'Pincode' for Transaction_Amount
+            pin_amount = state_df.groupby(['pincode'])['Transaction_amount'].sum().reset_index()
+
+            # Create a bar graph of pincode-wise transaction amount
+            fig_pincode = px.pie(
+                pin_amount,
+                names="pincode",
+                values="Transaction_amount",
+                title="Total Transaction Amount by Pincode in {} State {} Year Quarter {}".format(selected_state3, selected_year, selected_quarter)
+            )
+
             # Create a bar graph of state-wise transaction amount
             fig_state = px.bar(
                 state_amount,
@@ -303,6 +336,11 @@ def insights():
             # Display the graphs on Streamlit
             st.plotly_chart(fig_state)
             st.plotly_chart(fig_district)
+            st.plotly_chart(fig_pincode)
+
+        def pin_code():
+            webbrowser.open("http://1min.in/indiapost/pincode/826001")
+        st.button(label="click here to go pincode search", type="primary", on_click=pin_code)
 
         container = st.container()
         with container:
@@ -394,401 +432,83 @@ def insights():
                 )
                 with st.expander("Pie chart of Total transaction count by state"):
                     st.plotly_chart(Pie_chart)
-            with container:
-                df = pd.read_sql("select * from  map_transaction1;",conn)
-                grouped_df = df.groupby(['District_name'])['Transaction_amount'].sum()
-                dict_ = grouped_df.to_dict()
-                labels = list(dict_.keys())
-                sizes = list(dict_.values())
-                # st.write(dict_)
-                data = pd.DataFrame({
-                                        "District_name":labels,
-                                        "Transaction_amount":sizes
-                                    })
-                Pie_chart = px.pie(
-                data,
-                values="Transaction_amount",
-                names="District_name",
-                title="Pie chart of Total number of Map transactions amount by district",
-                height=300,
-                width=400,
-                )
-                with st.expander("Pie chart of Total Map transactions amount by district"):
-                    st.plotly_chart(Pie_chart)
-            with container:
-                df = pd.read_sql("select * from  map_transaction1;",conn)
-                grouped_df = df.groupby(['District_name'])['Transaction_count'].sum()
-                dict_ = grouped_df.to_dict()
-                labels = list(dict_.keys())
-                sizes = list(dict_.values())
-                # st.write(dict_)
-                data = pd.DataFrame({
-                                        "District_name":labels,
-                                        "Transaction_count":sizes
-                                    })
-                Pie_chart = px.pie(
-                data,
-                values="Transaction_count",
-                names="District_name",
-                title="Pie chart of Total number of Map transactions count by district",
-                height=300,
-                width=400,
-                )
-                with st.expander("Pie chart of Total Map transactions count by district"):
-                    st.plotly_chart(Pie_chart)
-            with container:
-                years = ["2018", "2019", "2020", "2021", "2022", "2023"]
-                st.warning("**Note**: the data have taken from 2018 to 2022 upto four Quaters (2023 two quaters)")
-                selected_year = st.selectbox("Select a year:", years)
-                if selected_year == '2018':
-                    if st.checkbox("Quater1"):
-                        def get_data():
-                            df = pd.read_sql("select * from q1_2018",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater2"):
-                        def get_data():
-                            df = pd.read_sql("select * from q2_2018",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater3"):
-                        def get_data():
-                            df = pd.read_sql("select * from q3_2018",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater4"):
-                        def get_data():
-                            df = pd.read_sql("select * from q4_2018",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                if selected_year == '2019':
-                    if st.checkbox("Quater1"):
-                        def get_data():
-                            df = pd.read_sql("select * from q1_2019",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater2"):
-                        def get_data():
-                            df = pd.read_sql("select * from q2_2019",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater3"):
-                        def get_data():
-                            df = pd.read_sql("select * from q3_2019",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater4"):
-                        def get_data():
-                            df = pd.read_sql("select * from q4_2019",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                if selected_year == '2020':
-                    if st.checkbox("Quater1"):
-                        def get_data():
-                            df = pd.read_sql("select * from q1_2020",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater2"):
-                        def get_data():
-                            df = pd.read_sql("select * from q2_2020",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater3"):
-                        def get_data():
-                            df = pd.read_sql("select * from q3_2020",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater4"):
-                        def get_data():
-                            df = pd.read_sql("select * from q4_2020",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                if selected_year == '2021':
-                    if st.checkbox("Quater1"):
-                        def get_data():
-                            df = pd.read_sql("select * from q1_2021",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater2"):
-                        def get_data():
-                            df = pd.read_sql("select * from q2_2021",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater3"):
-                        def get_data():
-                            df = pd.read_sql("select * from q3_2021",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater4"):
-                        def get_data():
-                            df = pd.read_sql("select * from q4_2021",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                if selected_year == '2022':
-                    if st.checkbox("Quater1"):
-                        def get_data():
-                            df = pd.read_sql("select * from q1_2022",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater2"):
-                        def get_data():
-                            df = pd.read_sql("select * from q2_2022",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater3"):
-                        def get_data():
-                            df = pd.read_sql("select * from q3_2022",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater4"):
-                        def get_data():
-                            df = pd.read_sql("select * from Q4_2022",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                if selected_year == '2023':
-                    if st.checkbox("Quater1"):
-                        def get_data():
-                            df = pd.read_sql("select * from q1_2023",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater2"):
-                        def get_data():
-                            df = pd.read_sql("select * from q2_2023",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['Transaction_Amount'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="Transaction_Amount", 
-                            color="State", 
-                            title="Total Transaction Amount by State"
-                            )
-                        st.plotly_chart(fig)
+
+            def get_data():
+                df = pd.read_sql("select * from aggregated_transactions;", conn, index_col="State")
+                return df
+
+            df = get_data()
+
+            # Create a multiselect widget for brands
+            type_options = df['Transaction_type'].unique()
+            selected_type = st.multiselect("Select Transaction_type :", type_options)
+
+            # Filter the DataFrame based on selected brands
+            filtered_df = df[df['Transaction_type'].isin(selected_type)]
+
+            # Group the data by state and brand and sum the count column
+            grouped_df = filtered_df.groupby(['State', 'Transaction_type'])['Transaction_Amount'].sum().reset_index()
+
+            fig = px.bar(
+                grouped_df,
+                x="State",
+                y="Transaction_Amount",
+                color="State",
+                labels={"Transaction_Amount": "Total_transaction_Amount"},
+                title="Total Transaction_Amount by State and Transaction_type"
+            )
+
+            # Display the Plotly chart in Streamlit
+            st.plotly_chart(fig, use_container_width=True)
+
     
     def users():
-        def get_data():
-            df = pd.read_sql("SELECT * FROM aggregate_users;",conn,index_col="State")
+        def get_data(year, quarter):
+            query = f"SELECT * FROM aggregate_users WHERE Year = {year} AND Quater = {quarter}"
+            df = pd.read_sql(query, conn, index_col="State")
             return df
 
-        df = get_data()
+        # Create a year slider
+        year_start = 2018
+        year_end = 2023
+        selected_year = st.slider("Select Year:", year_start, year_end)
 
-        # Aggregate data by 'State' for Transaction_Amount and Transaction_count
-        reg_users = df.groupby(['State'])['registered_users'].sum().reset_index()
+        # Create a quarter slider based on the selected year
+        quarter_start = 1
+        quarter_end = 4
+        selected_quarter = st.slider("Select Quarter:", quarter_start, quarter_end)
+
+        # Get data for the selected year and quarter
+        df = get_data(selected_year, selected_quarter)
+
+        # Aggregate data by 'State' for count and appOpens
+        reg_users = df.groupby(['State'])['count'].sum().reset_index()
         app = df.groupby(['State'])['appOpens'].sum().reset_index()
 
-        fig = px.bar(
-            reg_users, 
-            x="State", 
-            y="registered_users", 
-            color="State", 
-            title="Total registered_users by State"
-            )
-        with st.expander("Bar chart of registered_users by state"):
-            st.plotly_chart(fig)
-        fig = px.bar(
-            app, 
-            x="State", 
-            y="appOpens", 
-            color="State", 
-            title="Total appOpens by State"
-            )
-        with st.expander("Bar chart of appOpens by state"):
-            st.plotly_chart(fig)
+        # Create a Plotly bar chart for the total registered users by state
+        fig_reg_users = px.bar(
+            reg_users,
+            x="State",
+            y="count",
+            color="State",
+            title="Total Registered Users by State for Year {} Quarter {}".format(selected_year, selected_quarter)
+        )
+        st.plotly_chart(fig_reg_users)
+
+        # Create a Plotly bar chart for the total appOpens by state
+        fig_app = px.bar(
+            app,
+            x="State",
+            y="appOpens",
+            color="State",
+            title="Total App Opens by State for Year {} Quarter {}".format(selected_year, selected_quarter)
+        )
+        st.plotly_chart(fig_app)
 
         container = st.container()
         with container:
             df = pd.read_sql("select * from aggregate_users;",conn)
-            grouped_df = df.groupby(['State'])['Modified_registered_users'].sum()
+            grouped_df = df.groupby(['State'])['count'].sum()
             dict_ = grouped_df.to_dict()
             labels = list(dict_.keys())
             sizes = list(dict_.values())
@@ -863,10 +583,10 @@ def insights():
             st.plotly_chart(fig_state)
             st.plotly_chart(fig_district)
 
-        with st.expander("Top registeredUsers by state and district"):
+        with st.expander("Top registeredUsers by state and district and pincode"):
             st.header("Top registeredUsers by state and district")
             # Load the data
-            df = pd.read_sql("select * from top_users;",conn,index_col="State")
+            df = pd.read_sql("select * from top_users_district;",conn,index_col="State")
 
             # Create a multiselect for states
             state_options = df.index.unique().tolist()
@@ -896,6 +616,17 @@ def insights():
             # Aggregate data by 'District' for registeredUsers
             district_amount = state_df.groupby(['District_name'])['registeredUsers'].sum().reset_index()
 
+            df1 = pd.read_sql("select * from top_users_pincode;",conn,index_col="State")
+            def get_data_for_state_year_quarter(state, year, quarter):
+                state_df = df1.loc[state]
+                state_df = state_df.loc[(state_df['Year'] == year) & (state_df['Quater'] == quarter)]
+                return state_df
+
+            state_df = get_data_for_state_year_quarter(selected_state1, selected_year1, selected_quarter1)
+
+            # Aggregate data by 'State' for registeredUsers
+            pin_amount = state_df.groupby(['pincode'])['registeredUsers'].sum().reset_index()
+
             # Create a bar graph of state-wise registeredUsers
             fig_state = px.bar(
                 state_amount,
@@ -913,10 +644,20 @@ def insights():
                 color="District_name",
                 title="Total Registered Users by District in {} State {} Year Quarter {}".format(selected_state1, selected_year1, selected_quarter1)
             )
-
+            fig_pin = px.pie(
+                pin_amount,
+                names="pincode",
+                values="registeredUsers",
+                title="Total Registered Users by pincode in {} Year Quarter {}".format(selected_year1, selected_quarter1)
+            )
             # Display the graphs on Streamlit
             st.plotly_chart(fig_state)
             st.plotly_chart(fig_district)
+            st.plotly_chart(fig_pin)
+            
+        def pin_code():
+            webbrowser.open("http://1min.in/indiapost/pincode/826001")
+        st.button(label="click here to go pincode search", type="primary", on_click=pin_code)
 
         with container:
             df = pd.read_sql("select * from top_users;",conn)
@@ -942,7 +683,7 @@ def insights():
         container = st.container()
         with container:
             df = pd.read_sql("select * from aggregate_users;",conn)
-            grouped_df = df.groupby(['Brand'])['Modified_registered_users'].sum()
+            grouped_df = df.groupby(['Brand'])['count'].sum()
             dict_ = grouped_df.to_dict()
             labels = list(dict_.keys())
             sizes = list(dict_.values())
@@ -983,279 +724,36 @@ def insights():
             with st.expander("Pie chart of Total user count by state"):
                 st.plotly_chart(Pie_chart)
     
-            with container:
-                # Create a select box with the years
-                years = ["2018", "2019", "2020", "2021", "2022"]
-                st.warning("**Note**: the data have taken from 2018 to 2021 (2022 one quarter)")
-                selected_year = st.selectbox("Select a year:", years)
-
-                if selected_year == '2018':
-                    if st.checkbox("Quater1"):
-                        def get_data():
-                            df = pd.read_sql("select * from q1_user_2018",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater2"):
-                        def get_data():
-                            df = pd.read_sql("select * from q2_user_2018",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater3"):
-                        def get_data():
-                            df = pd.read_sql("select * from q3_user_2018",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater4"):
-                        def get_data():
-                            df = pd.read_sql("select * from q4_user_2018",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                if selected_year == '2019':
-                    if st.checkbox("Quater1"):
-                        def get_data():
-                            df = pd.read_sql("select * from q1_user_2019",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater2"):
-                        def get_data():
-                            df = pd.read_sql("select * from q2_user_2019",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater3"):
-                        def get_data():
-                            df = pd.read_sql("select * from q3_user_2019",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater4"):
-                        def get_data():
-                            df = pd.read_sql("select * from q4_user_2019",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                if selected_year == '2020':
-                    if st.checkbox("Quater1"):
-                        def get_data():
-                            df = pd.read_sql("select * from q1_user_2020",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater2"):
-                        def get_data():
-                            df = pd.read_sql("select * from q2_user_2020",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater3"):
-                        def get_data():
-                            df = pd.read_sql("select * from q3_user_2020",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater4"):
-                        def get_data():
-                            df = pd.read_sql("select * from q4_user_2020",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                if selected_year == '2021':
-                    if st.checkbox("Quater1"):
-                        def get_data():
-                            df = pd.read_sql("select * from q1_user_2021",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater2"):
-                        def get_data():
-                            df = pd.read_sql("select * from q2_user_2021",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater3"):
-                        def get_data():
-                            df = pd.read_sql("select * from q3_user_2021",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                    if st.checkbox("Quater4"):
-                        def get_data():
-                            df = pd.read_sql("select * from q4_user_2021",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-                if selected_year == '2022':
-                    if st.checkbox("Quater1"):
-                        def get_data():
-                            df = pd.read_sql("select * from q1_user_2022",conn)
-                            return df
-                        df = get_data()
-                        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
-                        fig = px.bar(
-                            data_amount, 
-                            x="State", 
-                            y="registered_users", 
-                            color="State", 
-                            title="Total registered_users by State"
-                            )
-                        st.plotly_chart(fig)
-
+            
             container = st.container()
-            with container:
-                def get_data():
-                    df = pd.read_sql("select * from aggregate_users",conn,index_col="State")
-                    return df
+            def get_data():
+                df = pd.read_sql("select * from aggregate_users", conn, index_col="State")
+                return df
 
-                df = get_data()
-    
-    # Group the data by state and brand and sum the count column
-                grouped_df = df.groupby(['State', 'Brand'])['Modified_registered_users'].sum().reset_index()
+            df = get_data()
 
-                # Create a Plotly bar chart for the user count
-                fig = px.bar(
-                    grouped_df,
-                    x="State",
-                    y="Modified_registered_users",
-                    color="Brand",
-                    labels={"Modified_registered_users": "Total Users count"},
-                    title="Total Users by State and Brand"
-                )
+            # Create a multiselect widget for brands
+            brand_options = df['Brand'].unique()
+            selected_brands = st.multiselect("Select Brand(s):", brand_options)
 
-                # Display the Plotly chart in Streamlit
-                st.plotly_chart(fig, use_container_width=True)
+            # Filter the DataFrame based on selected brands
+            filtered_df = df[df['Brand'].isin(selected_brands)]
+
+            # Group the data by state and brand and sum the count column
+            grouped_df = filtered_df.groupby(['State', 'Brand'])['count'].sum().reset_index()
+
+            # Create a Plotly bar chart for the user count
+            fig = px.bar(
+                grouped_df,
+                x="State",
+                y="count",
+                color="State",
+                labels={"count": "Total Users Count"},
+                title="Total Users by State and Brand"
+            )
+
+            # Display the Plotly chart in Streamlit
+            st.plotly_chart(fig, use_container_width=True)
 
     def drop_downs():
         def Q1():
@@ -1577,7 +1075,7 @@ def map_visualization():
             df = pd.read_sql("select * from aggregate_users",conn,index_col="State")
             return df
         df = get_data()
-        data_amount = df.groupby(['State'])['registered_users'].sum().reset_index()
+        data_amount = df.groupby(['State'])['count'].sum().reset_index()
 
         state_names = {"andaman-&-nicobar-islands":"Andaman & Nicobar",
                     "andhra-pradesh":"Andhra Pradesh",
@@ -1626,7 +1124,7 @@ def map_visualization():
             geojson="https://gist.githubusercontent.com/jbrobst/56c13bbbf9d97d187fea01ca62ea5112/raw/e388c4cae20aa53cb5090210a42ebb9b765c0a36/india_states.geojson",
             featureidkey='properties.ST_NM',
             locations='State',
-            color='registered_users',
+            color='count',
             color_continuous_scale= 'oxy' 
         )
 
@@ -4936,3 +4434,4 @@ page_functions = {
     "About": about
 }
 page_functions[selected]()
+
